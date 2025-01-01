@@ -9,6 +9,8 @@ import pandas as pd
 from collections import defaultdict
 import seaborn as sns
 import math
+import pandas as pd
+
 class VOMM:
     def __init__(self, max_order, laplace_smoothing=True, smoothing_value=0.04):
         """
@@ -16,7 +18,7 @@ class VOMM:
         """
         self.max_order = max_order
         self.context_tree = defaultdict(lambda: defaultdict(lambda: smoothing_value))
-        self.global_counts = defaultdict(lambda: smoothing_value)  # For 0th-order counts
+        self.global_counts = defaultdict(lambda: smoothing_value) 
         self.laplace_smoothing = laplace_smoothing
         self.smoothing_value = smoothing_value
 
@@ -26,7 +28,7 @@ class VOMM:
         If `is_interference` is True, applies decay to weight interference data.
         """
         for i in range(len(sequence)):
-            weight = decay if is_interference else 1  # Apply decay only for interference
+            weight = decay if is_interference else 1  
             # Update 0th-order counts with weighting
             self.global_counts[sequence[i]] += weight
             for order in range(1, self.max_order + 1):
@@ -43,15 +45,15 @@ class VOMM:
         Predicts the probabilities of symbols (0 and 1).
         Uses a backoff mechanism and proportional smoothing.
         """
-        context = tuple(context[-self.max_order:])  # Ensure context length matches max_order
+        context = tuple(context[-self.max_order:]) 
 
         while context:
             if context in self.context_tree:
-                # Get frequency counts for the current context
+                
                 symbol_counts = self.context_tree[context]
                 total = sum(symbol_counts.values())
 
-                # Apply proportional Laplace smoothing
+                
                 if self.laplace_smoothing:
                     # Ensure all possible symbols are included in the smoothing
                     for symbol in [0, 1]:  # Add all possible outcomes
@@ -62,10 +64,10 @@ class VOMM:
                 probabilities = {k: (v + self.smoothing_value) / total for k, v in symbol_counts.items()}
                 return probabilities.get(0, 0), probabilities.get(1, 0)
             
-            # Reduce context length (backoff mechanism)
+            
             context = context[1:]
 
-        # Fall back to 0th-order probabilities
+       
         total_counts = sum(self.global_counts.values())
         if total_counts == 0:
             return 0.5, 0.5  # Default probabilities if no training data
@@ -96,7 +98,6 @@ def generate_correctness_list_with_overlap(data_list, participant_response, inte
 
     # Iterate through each block
     for block_index, block in enumerate(blocks):
-        # Initialize the model for each block
         model = VOMM(max_order,smoothing_value=smooth)
         # Train on the interference with a uniform decay
         model.train(interference[block_index * 20:(block_index + 1) * 20], decay=decay, is_interference=True)
@@ -105,17 +106,14 @@ def generate_correctness_list_with_overlap(data_list, participant_response, inte
         for i in range(len(block)):
             sequence = block[i - max_order - 1:i]
             model.train(sequence)
-
-            # Ensure we're accessing the corresponding participant response
             next_value = pa_answer_block[block_index][i]
             
             probabilities = model.predict(sequence)
 
-            # Replace zero probabilities before appending to the correctness_list
             if probabilities[next_value] == 0.0:
                 probabilities = (0.001, 0.999) if next_value == 0 else (0.999, 0.001)
 
-            correctness_list.append(((next_value, probabilities[next_value]), probabilities))  # Access probability directly
+            correctness_list.append(((next_value, probabilities[next_value]), probabilities))  
 
     return correctness_list
 
@@ -123,12 +121,11 @@ def generate_correctness_list_with_overlap(data_list, participant_response, inte
 
 
 
-# Function to generate list based on base list and length
+
 def generate_list(base_list, list_length):
     cut_list = (base_list * (int(list_length)))[0:list_length]
     return cut_list
 
-# Function to plot accuracy over time without reset, but divided into blocks, with color change for each block
 def plot_accuracy_with_overlap(data_list,reference_list,inteference, maxorder,decay ,smooth,block_size):
     guesses = generate_correctness_list_with_overlap(data_list,reference_list,inteference, maxorder,decay ,smooth,block_size)
     guesses = [random.choices([0,1],weights = [i,k])[0] for (_,(i,k)) in guesses]
@@ -136,16 +133,15 @@ def plot_accuracy_with_overlap(data_list,reference_list,inteference, maxorder,de
     cumulative_accuracies = []
     cumulative_accuraciesREF=[]
     start_index = 0
-    colors = itertools.cycle(['b', 'g', 'r', 'c', 'm', 'y', 'k'])  # Cycle through different colors
+    colors = itertools.cycle(['b', 'g', 'r', 'c', 'm', 'y', 'k'])  
 
-    # Calculate cumulative accuracy for each block separately and plot as a single continuous graph
     for i in range(0, len(guesses), block_size):
-        # Each block may overlap by `sequence_length` with the next
+        
         correctness_list = guesses[i:i + block_size]
         cumulative_accuracy = [sum(correctness_list[:i + 1]) / (i + 1) for i in range(len(correctness_list))]
         cumulative_accuracies.extend(cumulative_accuracy)
 
-        # Plot segment for the current block with different color
+        
         block_indices = range(start_index, start_index + len(cumulative_accuracy))
         plt.plot(block_indices, cumulative_accuracy, label=f"Block {i // (block_size) + 1}", linestyle='-', color="black")
         plt.gca().set_facecolor('lightgrey' if (i // (block_size)) % 2 == 0 else 'white')
@@ -156,18 +152,18 @@ def plot_accuracy_with_overlap(data_list,reference_list,inteference, maxorder,de
     reference_list = [1 if guess == actual else 0 for guess, actual in zip(reference_list, data_list)]
     start_indexREF = 0
     for i in range(0, len(reference_list), block_size):
-        # Each block may overlap by `sequence_length` with the next
+        
         correctness_listREF = reference_list[i:i + block_size]
         cumulative_accuracyREF = [sum(correctness_listREF[:i + 1]) / (i + 1) for i in range(len(correctness_listREF))]
         cumulative_accuraciesREF.extend(cumulative_accuracyREF)
 
-        # Plot segment for the current block with different color
+        
         block_indices = range(start_indexREF, start_indexREF + len(cumulative_accuracyREF))
         plt.plot(block_indices, cumulative_accuracyREF, label=f"Block {i // (block_size) + 1}", linestyle='-', color=next(colors))
         plt.gca().set_facecolor('lightgrey' if (i // (block_size)) % 2 == 0 else 'white')
         start_indexREF += len(cumulative_accuracyREF)
         
-    # Finalize the plot
+    
     plt.xlabel("Index")
     plt.ylabel("Accuracy")
     plt.title("Prediction Accuracy Over Time with Overlap (Continuous Across Blocks)")
@@ -179,7 +175,7 @@ def plot_accuracy_with_overlap(data_list,reference_list,inteference, maxorder,de
     plt.show()
 
 
-# Example trial base lists
+
 trialBaseLists = [
     [0,1,0,1,1,0,0,0,1,1,1,1,0,0,1,0,0,0,1,1,0,0,1,1,1,0,0,0,1,0,0,1,1,0,1,1,1,1,0,1,0,1,1,1,0,1,0,1,1,1,0,0,0,0,1,1,0,1,1,1],
     [0,1,1,0,1,0,0,0,1,0,1,0,1,0,0,1,1,1,1,0,0,1,1,0,1,0,0,1,1,0,1,0,1,0,1,1,0,0,1,0,0,0,1,0,1,0,0,1,1,0],
@@ -198,34 +194,6 @@ trialListLength = 60
 trial_lists = [generate_list(base_list, trialListLength) for base_list in trialBaseLists]
 trial_list_combined = [item for sublist in trial_lists for item in sublist]
 
-import pandas as pd
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
-def plot_3d_points_with_sizes(data):
-    """
-    Creates a 3D scatter plot from a list of tuples with four elements.
-    The first three elements represent coordinates, and the fourth is the size of the point.
-
-    Args:
-        data (list of tuples): A list where each tuple contains four elements 
-                               (x, y, z, size).
-    """
-    # Unpack the tuples into separate lists
-    x_coords, y_coords, z_coords, sizes = zip(*data)
-
-    # Create a 3D scatter plot
-    fig = plt.figure(figsize=(13,7))
-    ax = fig.add_subplot(111, projection='3d')
-    scatter = ax.scatter(x_coords, y_coords, z_coords, s=[i * 1000 for i in sizes])
-
-    # Add labels
-    ax.set_xlabel('order')
-    ax.set_ylabel('decay')
-    ax.set_zlabel('smooth')
-
-    # Show the plot
-    plt.show()
 
 def get_trials_with_feedback(file_path):
     data = pd.read_csv(file_path)
@@ -244,6 +212,15 @@ def get_trials_with_feedback(file_path):
 
     return binary_responses_feedback, binary_responses_no_feedback
 
+
+
+
+# Define the total function for likelihood computation
+def total(likelyhood_list):
+    likelyhood_total = 1
+    for ((_, likelihood), _) in likelyhood_list:
+        likelyhood_total *= likelihood
+    return likelyhood_total
 
 def brute_force_bayes_factors(base_path, num_participants, max_order, block_size):
     results = []  # To store results for all participants
@@ -431,13 +408,6 @@ def brute_force_bayes_factors(base_path, num_participants, max_order, block_size
 
 
 
-# Define the total function for likelihood computation
-def total(likelyhood_list):
-    likelyhood_total = 1
-    for ((_, likelihood), _) in likelyhood_list:
-        likelyhood_total *= likelihood
-    return likelyhood_total
-
 # Run the brute force analysis
 if __name__ == "__main__":
     base_path = "/Users/Anton/Desktop/TSA/Data/Participant_"
@@ -449,7 +419,7 @@ if __name__ == "__main__":
     brute_force_bayes_factors(base_path, num_participants, max_order, block_size)
 
 
-import pandas as pd
+
 def plot_max_order_distribution_bar(results):
     # Extract the 'BestOrder' values from the results
     max_orders = results['BestOrder']
