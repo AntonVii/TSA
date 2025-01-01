@@ -15,3 +15,6 @@ There is also provided a file "analyzer.py" that produces a runnning accuracy
 plot for a participant.
 
 The experiment code for psycopy is also provided
+
+The csv provided is the model result for the 26 experiment participants who was part
+in our project! 
